@@ -53,7 +53,7 @@ def add_handler_override_options(app):
         if len(app.handler.list(i)) > 1:
             handlers = []
             for h in app.handler.list(i):
-                handlers.append(h())
+                handlers.append(app._resolve_handler(i, h))
 
             choices = [x._meta.label
                        for x in handlers
@@ -92,9 +92,9 @@ def handler_override(app):
 
     for i in app._meta.handler_override_options.keys():
         if not hasattr(app.pargs, '%s_handler_override' % i):
-            continue
+            continue  # pragma: nocover
         elif getattr(app.pargs, '%s_handler_override' % i) is None:
-            continue
+            continue  # pragma: nocover
         else:
             # get the argument value from command line
             argument = getattr(app.pargs, '%s_handler_override' % i)
@@ -151,7 +151,32 @@ class App(meta.MetaMixin):
         debug = False
         """
         Used internally, and should not be used by developers.  This is set
-        to ``True`` if ``--debug`` is passed at command line."""
+        to ``True`` if the ``debug`` option is passed at command line."""
+
+        debug_argument_options = ['-d', '--debug']
+        """
+        The argument option(s) to toggle debug mode via cli.
+        """
+
+        debug_argument_help = 'full application debug mode'
+        """
+        The debug argument help text that is displayed in ``--help``.
+        """
+
+        quiet = False
+        """
+        Used internally, and should not be used by developers.  This is set
+        to ``True`` if the ``quiet`` option is passed at command line."""
+
+        quiet_argument_options = ['-q', '--quiet']
+        """
+        The argument option(s) to toggle quiet mode via cli.
+        """
+
+        quiet_argument_help = 'suppress all console output'
+        """
+        The quiet argument help text that is displayed in ``--help``.
+        """
 
         exit_on_close = False
         """
@@ -167,7 +192,8 @@ class App(meta.MetaMixin):
 
         config_files = None
         """
-        List of config files to parse.
+        List of config files to parse (appended to the builtin list of config
+        files defined by Cement).
 
         Note: Though ``App.Meta.config_section`` defaults to ``None``, Cement
         will set this to a default list based on ``App.Meta.label`` (or in
@@ -195,7 +221,8 @@ class App(meta.MetaMixin):
 
         config_dirs = None
         """
-        List of config directories to search config files. For each direcory
+        List of config directories to search config files (appended to the
+        builtin list of directories defined by Cement). For each direcory
         cement will load all files that ends with ``.conf``.
 
         .. code-block:: python
@@ -225,15 +252,16 @@ class App(meta.MetaMixin):
 
         plugin_config_dirs = None
         """
-        A list of directory paths where plugin config files can be found.
+        A list of directory paths where plugin config files can be found
+        (appended to the builtin list of directories defined by Cement).
         Files must end in ``.conf`` (or the extension defined by
         ``App.Meta.config_file_suffix``) or they will be ignored. Additionally,
         plugin configuration sections must start with ``plugin.`` (ex:
         ``[plugin.myplugin]``).
 
-        Note: Though ``App.Meta.plugin_config_dirs`` is ``None``, Cement
-        will set this to a default list based on ``App.Meta.label``.
-        This will equate to:
+        Note: Though ``App.Meta.plugin_config_dirs`` defaults to ``None``,
+        Cement will populate this with a default list based on
+        ``App.Meta.label``. This will equate to:
 
         .. code-block:: python
 
@@ -283,10 +311,10 @@ class App(meta.MetaMixin):
         plugin_dirs = None
         """
         A list of directory paths where plugin code (modules) can be loaded
-        from.
+        from (appended to the builtin list of directories defined by Cement).
 
-        Note: Though ``App.Meta.plugin_dirs`` is ``None``, Cement will set
-        this to a default list based on ``App.Meta.label`` if not set.
+        Note: Though ``App.Meta.plugin_dirs`` defaults to ``None``, Cement will
+        populate this with a default list based on ``App.Meta.label``.
         This will equate to:
 
         .. code-block:: python
@@ -328,15 +356,6 @@ class App(meta.MetaMixin):
         Note: Though ``App.Meta.argv`` defaults to ``None``, Cement will set
         this to ``list(sys.argv[1:])`` if no argv is set in Meta during
         ``setup()``.
-        """
-
-        override_arguments = ['debug']
-        """
-        List of arguments that override their configuration counter-part.
-        For example, if ``--debug`` is passed (and it's config value is
-        ``debug``) then the ``debug`` key of all configuration sections will
-        be overridden by the value of the command line option (``True`` in
-        this example).
         """
 
         core_handler_override_options = dict(
@@ -563,10 +582,10 @@ class App(meta.MetaMixin):
         template_dirs = None
         """
         A list of directory paths where template files can be loaded
-        from.
+        from (appended to the builtin list of directories defined by Cement).
 
         Note: Though ``App.Meta.template_dirs`` defaults to ``None``,
-        Cement will set this to a default list based on
+        Cement will populate this with a default list based on
         ``App.Meta.label``.  This will equate to:
 
         .. code-block:: python
@@ -736,11 +755,16 @@ class App(meta.MetaMixin):
         if self._meta.argv is None:
             self._meta.argv = list(sys.argv[1:])
 
-        # hack for command line --debug
-        if '--debug' in self.argv:
-            self._meta.debug = True
+        # hack for command line debug/quiet options
+        if self._meta.debug_argument_options is not None:
+            if any(x in self.argv for x in self._meta.debug_argument_options):
+                self._meta.debug = True
 
-        # setup the cement framework
+        if self._meta.quiet_argument_options is not None:
+            if any(x in self.argv for x in self._meta.quiet_argument_options):
+                self._meta.quiet = True
+                self._suppress_output()
+
         self._lay_cement()
 
     @property
@@ -750,8 +774,8 @@ class App(meta.MetaMixin):
     @property
     def debug(self):
         """
-        Returns boolean based on whether ``--debug`` was passed at command
-        line or set via the application's configuration file.
+        Returns boolean based on whether the ``debug`` option was passed at
+        command line or set via the application's configuration file.
 
         :returns: boolean
         """
@@ -1021,28 +1045,6 @@ class App(meta.MetaMixin):
         self._last_rendered = (data, out_text)
         return out_text
 
-    def get_last_rendered(self):
-        """
-        Return the (data, output_text) tuple of the last time self.render()
-        was called.
-
-        Returns:
-            tuple: ``(data, output_text)``
-
-        Warnings:
-            DEPRECATION WARNING: This function is deprecated as of Cement 2.1.3
-            in favor of the :func:`App.last_rendered` property, and will be
-            removed in future versions of Cement.
-
-        """
-        if not is_true(self._meta.ignore_deprecation_warnings):
-            self.log.warning("Cement Deprecation Warning: " +
-                             "App.get_last_rendered() has been " +
-                             "deprecated, and will be removed in future " +
-                             "versions of Cement.  You should use the " +
-                             "App.last_rendered property instead.")
-        return self._last_rendered
-
     @property
     def last_rendered(self):
         """
@@ -1087,11 +1089,6 @@ class App(meta.MetaMixin):
         """Initialize the framework."""
         LOG.debug("laying cement for the '%s' application" %
                   self._meta.label)
-
-        if '--debug' in self._meta.argv:
-            self._meta.debug = True
-        elif '--quiet' in self._meta.argv:
-            self._suppress_output()
 
         self.interface = InterfaceManager(self)
         self.handler = HandlerManager(self)
@@ -1154,12 +1151,6 @@ class App(meta.MetaMixin):
             pass
 
         self._parsed_args = self.args.parse(self.argv)
-
-        for member in self._meta.override_arguments:
-            for section in self.config.get_sections():
-                if member in self.config.keys(section):
-                    self.config.set(section, member,
-                                    getattr(self._parsed_args, member))
 
         for res in self.hook.run('post_argument_parsing', self):
             pass
@@ -1224,21 +1215,33 @@ class App(meta.MetaMixin):
             self.config.merge(self._meta.config_defaults)
 
         if self._meta.config_files is None:
-            self._meta.config_files = [
-                fs.join('/', 'etc', label, '%s%s' % (label, ext)),
-                fs.join(fs.HOME_DIR, '.config', label, '%s%s' % (label, ext)),
-                fs.join(fs.HOME_DIR, '.config', label, 'config'),
-                fs.join(fs.HOME_DIR, '.config', '%s%s' % (label, ext)),
-                fs.join(fs.HOME_DIR, '.%s%s' % (label, ext)),
-                fs.join(fs.HOME_DIR, '.%s' % label, 'config'),
-            ]
+            self._meta.config_files = []
 
+        # add builtin config file paths (inserted to take presedence)
+        builtin_paths = [
+            fs.join(fs.HOME_DIR, '.%s' % label, 'config'),
+            fs.join(fs.HOME_DIR, '.%s%s' % (label, ext)),
+            fs.join(fs.HOME_DIR, '.config', '%s%s' % (label, ext)),
+            fs.join(fs.HOME_DIR, '.config', label, 'config'),
+            fs.join(fs.HOME_DIR, '.config', label, '%s%s' % (label, ext)),
+            fs.join('/', 'etc', label, '%s%s' % (label, ext)),
+        ]
+        for path in builtin_paths:
+            if path not in self._meta.config_files:
+                self._meta.config_files.insert(0, path)
+
+        # add builtin config dir paths (inserted to take presedence)
         if self._meta.config_dirs is None:
-            self._meta.config_dirs = [
-                fs.join('/', 'etc', label, 'conf.d'),
-                fs.join(fs.HOME_DIR, '.config', label, 'conf.d'),
-                fs.join(fs.HOME_DIR, '.%s' % label, 'conf.d'),
-            ]
+            self._meta.config_dirs = []
+
+        builtin_paths = [
+            fs.join(fs.HOME_DIR, '.%s' % label, 'conf.d'),
+            fs.join(fs.HOME_DIR, '.config', label, 'conf.d'),
+            fs.join('/', 'etc', label, 'conf.d'),
+        ]
+        for path in builtin_paths:
+            if path not in self._meta.config_dirs:
+                self._meta.config_dirs.insert(0, path)
 
         for _dir in self._meta.config_dirs:
             if not os.path.isdir(_dir):
@@ -1252,8 +1255,8 @@ class App(meta.MetaMixin):
 
         self.validate_config()
 
-        # hack for --debug
-        if '--debug' in self.argv or self._meta.debug is True:
+        # hack for debug command line option
+        if self._meta.debug is True:
             self.config.set(self._meta.config_section, 'debug', True)
 
         # override select Meta via config
@@ -1308,11 +1311,17 @@ class App(meta.MetaMixin):
 
         # plugin config dirs
         if self._meta.plugin_config_dirs is None:
-            self._meta.plugin_config_dirs = [
-                '/etc/%s/plugins.d/' % self._meta.label,
-                fs.join(fs.HOME_DIR, '.config', label, 'plugins.d'),
-                fs.join(fs.HOME_DIR, '.%s' % label, 'plugins.d'),
-            ]
+            self._meta.plugin_config_dirs = []
+
+        builtin_paths = [
+            fs.join(fs.HOME_DIR, '.%s' % label, 'plugins.d'),
+            fs.join(fs.HOME_DIR, '.config', label, 'plugins.d'),
+            '/etc/%s/plugins.d/' % self._meta.label,
+        ]
+        for path in builtin_paths:
+            if path not in self._meta.plugin_config_dirs:
+                self._meta.plugin_config_dirs.insert(0, path)
+
         config_dir = self._meta.plugin_config_dir
         if config_dir is not None:
             if config_dir not in self._meta.plugin_config_dirs:
@@ -1321,11 +1330,16 @@ class App(meta.MetaMixin):
 
         # plugin dirs
         if self._meta.plugin_dirs is None:
-            self._meta.plugin_dirs = [
-                fs.join(fs.HOME_DIR, '.%s' % label, 'plugins'),
-                fs.join(fs.HOME_DIR, '.config', label, 'plugins'),
-                '/usr/lib/%s/plugins' % self._meta.label,
-            ]
+            self._meta.plugin_dirs = []
+
+        builtin_paths = [
+            '/usr/lib/%s/plugins' % self._meta.label,
+            fs.join(fs.HOME_DIR, '.config', label, 'plugins'),
+            fs.join(fs.HOME_DIR, '.%s' % label, 'plugins'),
+        ]
+        for path in builtin_paths:
+            self._meta.plugin_dirs.insert(0, path)
+
         plugin_dir = self._meta.plugin_dir
         if plugin_dir is not None:
             if plugin_dir not in self._meta.plugin_dirs:
@@ -1350,26 +1364,6 @@ class App(meta.MetaMixin):
         self.output = self._resolve_handler('output',
                                             self._meta.output_handler,
                                             raise_error=False)
-        # # template module
-        # if self._meta.template_module is None:
-        #     self._meta.template_module = '%s.templates' % label
-        #
-        # # template dirs
-        # if self._meta.template_dirs is None:
-        #     self._meta.template_dirs = []
-        #     paths = [
-        #         fs.join(fs.HOME_DIR, '.%s' % label, 'templates'),
-        #         fs.join(fs.HOME_DIR, '.config', label, 'templates'),
-        #         '/usr/lib/%s/templates' % label,
-        #     ]
-        #     for path in paths:
-        #         self.add_template_dir(path)
-        #
-        # template_dir = self._meta.template_dir
-        # if template_dir is not None:
-        #     if template_dir not in self._meta.template_dirs:
-        #         # insert so that this dir has precedence
-        #         self._meta.template_dirs.insert(0, template_dir)
 
     def _setup_template_handler(self):
         if self._meta.template_handler is None:
@@ -1388,13 +1382,15 @@ class App(meta.MetaMixin):
         # template dirs
         if self._meta.template_dirs is None:
             self._meta.template_dirs = []
-            paths = [
-                fs.join(fs.HOME_DIR, '.%s' % label, 'templates'),
-                fs.join(fs.HOME_DIR, '.config', label, 'templates'),
-                '/usr/lib/%s/templates' % label,
-            ]
-            for path in paths:
-                self.add_template_dir(path)
+
+        builtin_paths = [
+            '/usr/lib/%s/templates' % label,
+            fs.join(fs.HOME_DIR, '.config', label, 'templates'),
+            fs.join(fs.HOME_DIR, '.%s' % label, 'templates'),
+        ]
+        for path in builtin_paths:
+            if path not in self._meta.template_dirs:
+                self._meta.template_dirs.insert(0, path)
 
         template_dir = self._meta.template_dir
         if template_dir is not None:
@@ -1418,12 +1414,16 @@ class App(meta.MetaMixin):
                                           self._meta.argument_handler)
         self.args.prog = self._meta.label
 
-        self.args.add_argument('--debug', dest='debug',
-                               action='store_true',
-                               help='full application debug mode')
-        self.args.add_argument('--quiet', dest='suppress_output',
-                               action='store_true',
-                               help='suppress all output')
+        if self._meta.debug_argument_options is not None:
+            self.args.add_argument(*self._meta.debug_argument_options,
+                                   dest='debug',
+                                   action='store_true',
+                                   help=self._meta.debug_argument_help)
+        if self._meta.quiet_argument_options is not None:
+            self.args.add_argument(*self._meta.quiet_argument_options,
+                                   dest='suppress_output',
+                                   action='store_true',
+                                   help=self._meta.quiet_argument_help)
 
         # merge handler override meta data
         if self._meta.handler_override_options is not None:

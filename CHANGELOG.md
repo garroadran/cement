@@ -12,7 +12,8 @@ Bugs:
     - [Issue #440](https://github.com/datafolklabs/cement/issues/440)
 - `[ext.argparse]` Empty Sub-Commands List
     - [Issue #444](https://github.com/datafolklabs/cement/issues/444)
-
+- `[core.foundation]` Handler Override Options Do Not Honor Meta Defaults
+    - [Issue #513](https://github.com/datafolklabs/cement/issues/513)
 
 Features:
 
@@ -56,6 +57,7 @@ Incompatible:
 - `[core]` Replace Interfaces with ABC Base Classes
     - [Issue #192](https://github.com/datafolklabs/cement/issues/192)
 - `[core.foundation]` Rename `CementApp` to `App`.
+- `[core.foundation]` Drop deprecated `App.Meta.override_arguments`
 - `[core.handler]` Rename `CementBaseHandler` to `Handler`
 - `[core.handler]` Drop deprecated backend globals
 - `[core.hook]` Drop deprecated backend globals
@@ -64,6 +66,8 @@ Incompatible:
 - `[ext.argcomplete]` Drop ArgComplete Extension
 - `[ext.reload_config]` Drop Reload Config Extension
 - `[ext.configobj]` Drop ConfigObj Extension
+- `[ext.json]` Disable `overridable` option by default
+- `[ext.yaml]` Disable `overridable` option by default
 - `[ext.json_configobj]` Drop JSON ConfigObj Extension
 - `[ext.yaml_configobj]` Drop YAML ConfigObj Extension
 - `[ext.genshi]` Drop Genshi Extension

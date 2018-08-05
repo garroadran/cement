@@ -1,14 +1,15 @@
-.PHONY: clean dev test docker dist dist-upload
+.PHONY: clean virtualenv test docker dist dist-upload
 
 clean:
 	find . -name '*.py[co]' -delete
-	rm -rf docs/build
 
-dev:
-	docker-compose up -d
-	docker-compose exec {{ label }} pip install -r requirements-dev.txt
-	docker-compose exec {{ label }} python setup.py develop
-	docker-compose exec {{ label }} /bin/bash
+virtualenv:
+	virtualenv --prompt '|> {{ label }} <| ' env
+	env/bin/pip install -r requirements-dev.txt
+	env/bin/python setup.py develop
+	@echo
+	@echo "VirtualENV Setup Complete. Now run: source env/bin/activate"
+	@echo
 
 test:
 	python -m pytest \

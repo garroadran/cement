@@ -1,100 +1,5 @@
 """
-The Logging Extension provides log handling based on
-the standard :py:class:`logging.Logger`, and is the default log
-handler used by Cement.
-
-Requirements
-------------
-
- * No external dependencies.
-
-Configuration
--------------
-
-This extension honors the following configuration settings from the config
-section ``log.logging``:
-
-    * level
-    * file
-    * to_console
-    * rotate
-    * max_bytes
-    * max_files
-
-
-A sample config section (in any config file) might look like:
-
-.. code-block:: text
-
-    [log.logging]
-    file = /path/to/config/file
-    level = info
-    to_console = true
-    rotate = true
-    max_bytes = 512000
-    max_files = 4
-
-Usage
------
-
-.. code-block:: python
-
-    from cement import App
-
-    with App('myapp') as app:
-        app.log.info("This is an info message")
-        app.log.warning("This is an warning message")
-        app.log.error("This is an error message")
-        app.log.fatal("This is a fatal message")
-        app.log.debug("This is a debug message")
-
-
-Toggle Log Level Via Commandline Argument
------------------------------------------
-
-This extension adds a commandline argument to toggle the log level on the fly:
-
-.. code-block:: text
-
-    $ python myapp.py --help
-    usage: myapp [-h] [--debug] [--quiet] [-l {info,warning,error,debug,fatal}]
-
-    optional arguments:
-      -h, --help            show this help message and exit
-      --debug               full application debug mode
-      --quiet               suppress all output
-      -l {info,warning,error,debug,fatal}
-                            logging level
-
-
-    $ python myapp.py
-    INFO: This is an info message
-    WARNING: This is an warning message
-    ERROR: This is an error message
-    CRITICAL: This is a fatal message
-
-    $ python myapp.py -l error
-    ERROR: This is an error message
-    CRITICAL: This is a fatal message
-
-
-**Disabling The Commandline Argument**
-
-If no command line argument is desired, you can disable it by setting the
-``App.Meta.meta_defaults`` for the ``log.logging`` handler:
-
-.. code-block:: python
-
-    from cement import App, init_defaults
-
-    meta = init_defaults('log.logging')
-    meta['log.logging']['log_level_argument'] = None
-
-    class MyApp(App):
-        class Meta:
-            label = 'myapp'
-            meta_defaults = meta
-
+Cement logging extension module.
 """
 
 import os
@@ -179,9 +84,10 @@ class LoggingLogHandler(log.LogHandler):
             max_files=4,
         )
 
-        #: The arguments to use for the cli options.  If a log-level argument
-        #: is not wanted, set to `None`
-        log_level_argument = ['-l']
+        #: List of arguments to use for the cli options
+        #: (ex: [``-l``, ``--list``]).  If a log-level argument is not wanted,
+        #: set to ``None`` (default).
+        log_level_argument = None
 
         #: The help description for the log level argument
         log_level_argument_help = 'logging level'

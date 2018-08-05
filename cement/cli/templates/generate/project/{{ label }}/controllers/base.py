@@ -1,13 +1,12 @@
 
 from cement import Controller, ex
+from cement.utils.version import get_version_banner
 from ..core.version import get_version
 
 VERSION_BANNER = """
-{{ description }}
-Version: %s
-Created by: {{ creator }}
-URL: {{ url }}
-""" % get_version()
+{{ description }} %s
+%s
+""" % (get_version(), get_version_banner())
 
 
 class Base(Controller):

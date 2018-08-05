@@ -7,19 +7,6 @@ from cement.utils.test import TestApp
 from cement.utils import fs
 
 
-# CONFIG = '''
-#     section:
-#         subsection:
-#             list:
-#                 - item1
-#                 - item2
-#                 - item3
-#                 - item4
-#             key: value
-#         key1: ok1
-#         key2: ok2
-# '''
-
 CONFIG_PARSED = dict(
     section=dict(
         subsection=dict(
@@ -41,6 +28,7 @@ class YamlApp(TestApp):
         config_handler = 'yaml'
         config_files = [CONFIG]
         argv = ['-o', 'yaml']
+        meta_defaults = {'output.yaml': {'overridable': True}}
 
 
 def test_yaml():

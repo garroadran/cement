@@ -105,6 +105,21 @@ def test_no_default(tmp):
             assert 'Bogus' in res
 
 
+def test_clone(tmp):
+    # first test for already exists
+    argv = ['generate', 'test1', '--clone', tmp.dir]
+    with raises(AssertionError, match='(.*)already exists(.*)'):
+        with GenerateApp(argv=argv) as app:
+            app.run()
+
+    # then force it
+    argv = ['generate', 'test1', '--clone', tmp.dir, '--force']
+    with GenerateApp(argv=argv) as app:
+        app.run()
+
+    assert exists_join(tmp.dir, '.generate.yml')
+
+
 # coverage
 
 def test_generate_from_template_dir(tmp):
@@ -118,3 +133,20 @@ def test_generate_default_command(tmp):
     argv = ['generate']
     with GenerateApp(argv=argv) as app:
         app.run()
+
+
+def test_filtered_sub_dirs(tmp):
+    tmp.cleanup = False
+    argv = ['generate', 'test4', tmp.dir, '--defaults']
+
+    with GenerateApp(argv=argv) as app:
+        app.run()
+
+        assert exists_join(tmp.dir, 'take-me')
+        assert exists_join(tmp.dir, 'take-me', 'take-me')
+        assert exists_join(tmp.dir, 'take-me', 'exclude-me')
+        assert not exists_join(tmp.dir, 'take-me', 'ignore-me')
+        assert exists_join(tmp.dir, 'exclude-me')
+        assert exists_join(tmp.dir, 'exclude-me', 'take-me')
+        assert not exists_join(tmp.dir, 'ignore-me')
+        assert not exists_join(tmp.dir, 'ignore-me', 'take-me')

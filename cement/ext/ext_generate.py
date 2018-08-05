@@ -1,128 +1,14 @@
 """
-The Generate Extension provides a mechanism for generating common content
-from template directories.  Example use case would be the ability for
-application developers to easily generate new plugins for their application...
-or similar in other applications such as Chef Software's
-``chef generate cookbook`` type utilities.
-
-The Cement CLI uses this extension to generate apps, plugins, extensions, and
-scripts for developers building their applications on the framework.
-
-**Requirements**
-
- * pyYaml (``pip install pyYaml``)
- * A valid TemplateHandler must be defined at the application level via
-   ``App.Meta.template_handler`` such as ``jinja2``, ``mustache``, etc.
-
-
-**Configuration**
-
-This extension does not currently honor any application configuration settings.
-
-**App Meta Data**
-
-This extension honors the following ``App.Meta`` options:
-
-* **template_handler**: A handler class that implements the Template interface.
-* **template_dirs**: A list of data directories to look for templates.
-* **template_module**: A python module to look for templates.
-
-**Example**
-
-.. code-block:: python
-
-    from cement import App
-
-    class MyApp(App):
-        class Meta:
-            label = 'myapp'
-            extensions = ['generate', 'jinja2']
-            template_handler = 'jinja2'
-
-
-    with MyApp() as app:
-        app.run()
-
-
-Looks like:
-
-.. code-block:: console
-
-    $ python myapp.py --help
-    usage: myapp [-h] [--debug] [--quiet] {generate} ...
-
-    optional arguments:
-      -h, --help  show this help message and exit
-      --debug     toggle debug output
-      --quiet     suppress all output
-
-    sub-commands:
-      {generate}
-        generate  generate controller
-
-
-    $ python myapp.py generate --help
-    usage: myapp generate [-h] {plugin} ...
-
-    optional arguments:
-      -h, --help  show this help message and exit
-
-    sub-commands:
-      {plugin}
-        plugin      generate plugin from template
-
-
-**Generate Templates**
-
-The Generate Extension looks for a ``generate`` sub-directory in all defined
-template directory paths defined at the application level.  If it finds a
-``generate`` directory it treats all items within that directory as a
-generate template.
-
-A Generate Template requires a single configuration YAML file called
-``.generate.yml`` that looks something like:
-
-.. code-block:: yaml
-
-    ---
-
-    ignore:
-        - "^(.*)ignore-this(.*)$"
-        - "^(.*)ignore-that(.*)$"
-
-    exclude:
-        - "^(.*)exclude-this(.*)$"
-        - "^(.*)exclude-that(.*)$"
-
-    variables:
-        - name: 'my_variable_name'
-          prompt: 'The Prompt Displayed to The User'
-
-**Generate Template Configuration**
-
-The following configurations are supported in a generate template's config:
-
-* **ignore**: A list of regular expressions to match files that you want to
-  completely ignore.
-* **exclude**: A list of regular expressions to match files that you want to
-  copy, but not render as a template.
-* **variables**: A list of variable definitions that support the following
-  sub-keys:
-    * **name** *(required)*: The variable name (how it will be used in the
-      template).
-    * **prompt** *(required)*: The text displayed to the user to prompt for the
-      value of ``name``.
-    * **validate**: A single regular expression to validate the input value
-      with.
-    * **case**: A case modifyer to apply to the input value.  Valid options
-      are: ``lower``, ``upper``, ``title``.
+Cement generate extension module.
 """
 
 import re
 import os
 import inspect
 import yaml
+import shutil
 from .. import Controller, minimal_logger, shell, FrameworkError
+from ..utils.version import VERSION, get_version
 
 LOG = minimal_logger(__name__)
 
@@ -131,14 +17,20 @@ class GenerateTemplateAbstractBase(Controller):
     class Meta:
         pass
 
-    def _default(self):
-        source = self._meta.source_path
-        dest = self.app.pargs.dest
+    def _generate(self, source, dest):
         msg = 'Generating %s %s in %s' % (
                    self.app._meta.label, self._meta.label, dest
                )
         self.app.log.info(msg)
         data = {}
+
+        # builtin vars
+        maj_min = float('%s.%s' % (VERSION[0], VERSION[1]))
+        data['cement'] = {}
+        data['cement']['version'] = get_version()
+        data['cement']['major_version'] = VERSION[0]
+        data['cement']['minor_version'] = VERSION[1]
+        data['cement']['major_minor_version'] = maj_min
 
         f = open(os.path.join(source, '.generate.yml'))
         g_config = yaml.load(f)
@@ -213,6 +105,29 @@ class GenerateTemplateAbstractBase(Controller):
             else:
                 raise  # pragma: nocover
 
+    def _clone(self, source, dest):
+        msg = 'Cloning %s %s template to %s' % (
+                   self.app._meta.label, self._meta.label, dest
+               )
+        self.app.log.info(msg)
+
+        if os.path.exists(dest) and self.app.pargs.force is True:
+            shutil.rmtree(dest)
+        elif os.path.exists(dest):
+            msg = "Destination path already exists: %s (try: --force)" % dest
+            raise AssertionError(msg)
+
+        shutil.copytree(source, dest)
+
+    def _default(self):
+        source = self._meta.source_path
+        dest = self.app.pargs.dest
+
+        if self.app.pargs.clone is True:
+            self._clone(source, dest)
+        else:
+            self._generate(source, dest)
+
 
 def setup_template_items(app):
     template_dirs = []
@@ -274,6 +189,11 @@ def setup_template_items(app):
                         (['-D', '--defaults'],
                          {'help': 'use all default variable values',
                           'dest': 'defaults',
+                          'action': 'store_true'}),
+                        # ------------------------------------------------------
+                        (['--clone'],
+                         {'help': 'clone this template to destination path',
+                          'dest': 'clone',
                           'action': 'store_true'}),
                     ]
                     source_path = os.path.join(path, item)

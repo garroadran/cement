@@ -28,6 +28,7 @@ class JsonApp(TestApp):
         config_handler = 'json'
         config_files = [CONFIG]
         argv = ['-o', 'json']
+        meta_defaults = {'output.json': {'overridable': True}}
 
 
 def test_json():
