@@ -96,7 +96,7 @@ def test_invalid_variable_value(tmp):
 
 def test_no_default(tmp):
     shell.Prompt.prompt = Mock(return_value='Bogus')
-    argv = ['generate', 'test4', tmp.dir]
+    argv = ['generate', 'test5', tmp.dir]
 
     with GenerateApp(argv=argv) as app:
         app.run()
