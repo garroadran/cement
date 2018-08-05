@@ -58,7 +58,13 @@ def test_memcached_get(key):
 
 def test_memcached_delete(key):
     with MemcachedApp() as app:
+        # When deleting a key that doesn't exist
         app.cache.delete(key)
+
+        # When deleting a key that does exist
+        app.cache.set(key, 4321)
+        app.cache.delete(key)
+        assert app.cache.get(key) is None
 
 
 def test_memcached_purge(key):

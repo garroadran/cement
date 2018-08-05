@@ -1,6 +1,8 @@
 
 import os
 import yaml
+from unittest.mock import Mock
+from cement.ext.ext_yaml import YamlConfigHandler
 from cement.utils.test import TestApp
 from cement.utils import fs
 
@@ -60,8 +62,9 @@ def test_keys():
 
 
 def test_parse_file_bad_path():
+    YamlConfigHandler._parse_file = Mock()
     with YamlApp(config_files=['./some_bogus_path']):
-        pass
+        assert not YamlConfigHandler._parse_file.called
 
 
 def test_parse_file():
